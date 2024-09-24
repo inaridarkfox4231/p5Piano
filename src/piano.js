@@ -334,6 +334,7 @@ class SpringEnvelope{
     this.keyboard.display(cover);
   }
   releaseKeyBoard(){
+    if(this.keyboard===null)return;
     this.keyboard.setFlag(false);
     this.keyboard = null;
   }
