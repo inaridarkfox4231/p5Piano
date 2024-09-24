@@ -22,6 +22,37 @@
 
 // できたようです。
 
+// スマホだとキーボード要らないので
+// pixiの裏技を使います
+
+// pixiがこういうのやってた
+/** 端末ごとにパフォーマンスを調整するための変数です。 */
+const nav = window.navigator;
+let isMobile = false;
+if (nav.platform !== undefined) {
+  // platformが定義されている場合
+  switch (nav.platform) {
+    case "Win32": // Windowsだったら
+    case "MacIntel": // OS Xだったら
+      isMobile = false;
+      break;
+    case "iPhone": // iPhoneだったら
+    default:
+      // その他の端末も
+      isMobile = true;
+  }
+} else if (nav.userAgentData !== undefined) {
+  // userAgentDataが利用可能な場合
+  if (nav.userAgentData.mobile) {
+    isMobile = true;
+  } else {
+    isMobile = false;
+  }
+} else {
+  // いずれでもなければtrueにする
+  isMobile = true;
+}
+
 let guide;
 let cover;
 
@@ -59,7 +90,7 @@ function preload(){
 }
 
 function setup() {
-  createCanvas(800, 800);
+  createCanvas(800, (isMobile ? 400 : 800));
   pixelDensity(1);
 
   IA = new foxIA.Interaction(this.canvas, {factory:()=>{
@@ -128,7 +159,9 @@ function draw() {
   background(128);
 
   image(guide,0,0);
-  image(keyMapGuide,0,400);
+  if(!isMobile){
+    image(keyMapGuide,0,400);
+  }
 
   for(const e of envArray){
     e.updateState();
