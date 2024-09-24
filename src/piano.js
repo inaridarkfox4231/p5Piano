@@ -32,6 +32,8 @@
 // で、スマホだと普通に同時押しできたので、まあタブレットとかなら大丈夫かと。
 // 以上です。ロジックはOKぽいです。
 
+// legato導入できたにょ
+
 // pixiがこういうのやってた
 /** 端末ごとにパフォーマンスを調整するための変数です。 */
 const nav = window.navigator;
@@ -117,13 +119,13 @@ function setup() {
 
   strokeWeight(2);
   for(let i=0; i<whiteKeyArray.length; i++){
-    whiteKeys.push(new RectFigure(
+    whiteKeys.push(new KeyBoardRectFigure(
       whiteKeyArray[i], i*50, 200, 50, 200
     ));
   }
   for(let i=0;i<blackKeyArray.length;i++){
     if(blackKeyArray[i]>100)continue;
-    blackKeys.push(new RectFigure(
+    blackKeys.push(new KeyBoardRectFigure(
       blackKeyArray[i], -25+i*50, 0, 50, 200
     ));
   }
@@ -217,7 +219,21 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     //const keyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,22];
     //const k = whiteKeyArray[floor(constrain(this.x,0,799)/50)];
     const k = getKey(this.x, this.y);
+    if(k === null)return;
+    this.env.play({
+      type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
+    });
+    this.env.captureKeyBoard(k);
+    //k.display(cover);
+  }
+  legato(){
+    if(this.env===null)return;
+    const k = getKey(this.x, this.y);
     if(k===null)return;
+    if(k.isCaptured())return;
+    this.release();
+    this.env = getEnvelope();
+    if(this.env===null)return;
     this.env.play({
       type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
     });
@@ -230,13 +246,19 @@ class OscillatorPointer extends foxIA.PointerPrototype{
   mouseDownAction(e){
     this.capture();
   }
+  mouseMoveAction(e){
+    this.legato();
+  }
   mouseUpAction(){
     this.release();
   }
   touchStartAction(t){
     this.capture();
   }
-  touchEndAction(t){
+  touchMoveAction(t){
+    this.legato();
+  }
+  touchEndAction(){
     this.release();
   }
 }
@@ -304,6 +326,7 @@ class SpringEnvelope{
     this.lineColor = random(lineColorPalette);
   }
   captureKeyBoard(k){
+    k.setFlag(true);
     this.keyboard = k;
   }
   displayKeyBoard(){
@@ -311,6 +334,7 @@ class SpringEnvelope{
     this.keyboard.display(cover);
   }
   releaseKeyBoard(){
+    this.keyboard.setFlag(false);
     this.keyboard = null;
   }
   initialize(ctx){
@@ -418,6 +442,19 @@ class RectFigure extends FigureObject{
   }
   display(target){
     target.rect(this.x, this.y, this.w, this.h);
+  }
+}
+
+class KeyBoardRectFigure extends RectFigure{
+  constructor(v, x, y, w, h){
+    super(v,x,y,w,h);
+    this.captured = false;
+  }
+  isCaptured(){
+    return this.captured;
+  }
+  setFlag(flag){
+    this.captured = flag;
   }
 }
 
