@@ -33,6 +33,13 @@
 // 以上です。ロジックはOKぽいです。
 
 // legato導入できたにょ
+// ロジック変更だそうです。
+// ざっくりいうとkeyのvalueを比較する方法で判定しようと。で、
+// 取得の際に先にキーが取れるかどうか調べる。
+// 今のロジックだと先にenvをリザーブしてしまうので
+// activateされてないのにenvが捕捉されてしまうのです。
+// それは困る。
+// KeyAgentについてはキーの取得が前提なので問題ないです
 
 // pixiがこういうのやってた
 /** 端末ごとにパフォーマンスを調整するための変数です。 */
@@ -119,13 +126,13 @@ function setup() {
 
   strokeWeight(2);
   for(let i=0; i<whiteKeyArray.length; i++){
-    whiteKeys.push(new KeyBoardRectFigure(
+    whiteKeys.push(new RectFigure(
       whiteKeyArray[i], i*50, 200, 50, 200
     ));
   }
   for(let i=0;i<blackKeyArray.length;i++){
     if(blackKeyArray[i]>100)continue;
-    blackKeys.push(new KeyBoardRectFigure(
+    blackKeys.push(new RectFigure(
       blackKeyArray[i], -25+i*50, 0, 50, 200
     ));
   }
@@ -161,7 +168,6 @@ function setup() {
       }
     });
   }
-
 }
 
 function draw() {
@@ -214,12 +220,12 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = null;
   }
   capture(){
-    this.env = getEnvelope();
-    if(this.env === null) return;
-    //const keyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,22];
-    //const k = whiteKeyArray[floor(constrain(this.x,0,799)/50)];
+    // 先にキーを捕捉し、失敗したら何もしない。
     const k = getKey(this.x, this.y);
     if(k === null)return;
+    // キーが捕捉できたらenvを捕捉する
+    this.env = getEnvelope();
+    if(this.env === null) return;
     this.env.play({
       type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
     });
@@ -227,10 +233,13 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     //k.display(cover);
   }
   legato(){
+    // とらえたキーのvalueとthis.env.keyboard.getValue()を比較
     if(this.env===null)return;
     const k = getKey(this.x, this.y);
     if(k===null)return;
-    if(k.isCaptured())return;
+    // ここで比較する。同じ場合は乗り換えない。
+    if(k.getValue() === this.env.getValue())return;
+    //if(k.isCaptured())return;
     this.release();
     this.env = getEnvelope();
     if(this.env===null)return;
@@ -326,7 +335,6 @@ class SpringEnvelope{
     this.lineColor = random(lineColorPalette);
   }
   captureKeyBoard(k){
-    k.setFlag(true);
     this.keyboard = k;
   }
   displayKeyBoard(){
@@ -335,8 +343,12 @@ class SpringEnvelope{
   }
   releaseKeyBoard(){
     if(this.keyboard===null)return;
-    this.keyboard.setFlag(false);
     this.keyboard = null;
+  }
+  getValue(){
+    // 補足してるキーの...valueを出す。無い場合はnullを返す。
+    if(this.keyboard===null)return null;
+    return this.keyboard.getValue();
   }
   initialize(ctx){
     this.ctx = ctx;
@@ -443,19 +455,6 @@ class RectFigure extends FigureObject{
   }
   display(target){
     target.rect(this.x, this.y, this.w, this.h);
-  }
-}
-
-class KeyBoardRectFigure extends RectFigure{
-  constructor(v, x, y, w, h){
-    super(v,x,y,w,h);
-    this.captured = false;
-  }
-  isCaptured(){
-    return this.captured;
-  }
-  setFlag(flag){
-    this.captured = flag;
   }
 }
 
