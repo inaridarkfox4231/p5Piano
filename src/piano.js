@@ -22,13 +22,83 @@
 
 // できたようです。
 
+// スマホだとキーボード要らないので
+// pixiの裏技を使います
+
+// D,H,Kの同時押しできないからロジックがバグってるのかと思ったら
+// どうやら仕様らしい
+// 特定の3つのキーの同時押しができない仕様が存在するという
+// そうなんだ...
+// で、スマホだと普通に同時押しできたので、まあタブレットとかなら大丈夫かと。
+// 以上です。ロジックはOKぽいです。
+
+// legato導入できたにょ
+// ロジック変更だそうです。
+// ざっくりいうとkeyのvalueを比較する方法で判定しようと。で、
+// 取得の際に先にキーが取れるかどうか調べる。
+// 今のロジックだと先にenvをリザーブしてしまうので
+// activateされてないのにenvが捕捉されてしまうのです。
+// それは困る。
+// KeyAgentについてはキーの取得が前提なので問題ないです
+
+// pixiがこういうのやってた
+/** 端末ごとにパフォーマンスを調整するための変数です。 */
+const nav = window.navigator;
+let isMobile = false;
+if (nav.platform !== undefined) {
+  // platformが定義されている場合
+  switch (nav.platform) {
+    case "Win32": // Windowsだったら
+    case "MacIntel": // OS Xだったら
+      isMobile = false;
+      break;
+    case "iPhone": // iPhoneだったら
+    default:
+      // その他の端末も
+      isMobile = true;
+  }
+} else if (nav.userAgentData !== undefined) {
+  // userAgentDataが利用可能な場合
+  if (nav.userAgentData.mobile) {
+    isMobile = true;
+  } else {
+    isMobile = false;
+  }
+} else {
+  // いずれでもなければtrueにする
+  isMobile = true;
+}
+
+// 主な変更点
+// configを導入して音量とオシレータタイプを変えられるようにした
+// 線を描画するのはキーボードを塗った後
+// 鍵盤を2つ追加
+// 線の色を青系統に変更
+
+const config = {
+  oscType: "triangle",
+  volume: 0.5
+}
+
+function createGUI(){
+  const gui = new lil.GUI();
+  gui.add(config, "oscType", ["triangle","square","sine","sawtooth"]);
+  gui.add(config, "volume", 0, 1, 0.01);
+  // このように書くとデフォルトで閉じていてくれる
+  gui.close();
+}
+
 let guide;
 let cover;
 
 let actx;
 //const actx = new AudioContext();
 
-const lineColorPalette = ["red","blue","green","orange","pink"];
+// cf:https://openprocessing.org/sketch/1966344
+const lineColorPalette = [
+  "blue","aquamarine","turquoise","teal","seagreen",
+  "navy","deepskyblue","dodgerblue","steelblue","royalblue"
+];
 
 let IA;
 let KA;
@@ -38,11 +108,10 @@ let envArray = [];
 const whiteKeys = [];
 const blackKeys = [];
 const allKeys = [];
-const whiteKeyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,23,24];
+const whiteKeyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,23,24,26];
 const blackKeyArray = [
-  -4, -2, 999, 1, 3, 999, 6, 8, 10, 999, 13, 15, 999, 18, 20, 22, 999
+  -4, -2, 999, 1, 3, 999, 6, 8, 10, 999, 13, 15, 999, 18, 20, 22, 999, 25, 27
 ];
-
 // [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,22]
 const freqMap = {
   KeyA:-3, KeyS:-1, KeyD:0, KeyF:2, KeyG:4, KeyH:5, KeyJ:7, KeyK:9, KeyL:11,
@@ -59,8 +128,9 @@ function preload(){
 }
 
 function setup() {
-  createCanvas(800, 800);
+  createCanvas(900, (isMobile ? 400 : 800));
   pixelDensity(1);
+  createGUI();
 
   IA = new foxIA.Interaction(this.canvas, {factory:()=>{
     if(actx === undefined){
@@ -97,12 +167,12 @@ function setup() {
     return 0;
   });
 
-  guide = createGraphics(800,400);
+  guide = createGraphics(900,400);
   displayKeys(guide);
   guide.noStroke().fill(255).textAlign(LEFT,TOP).textSize(16).textStyle(ITALIC);
   guide.text("mouse,touch,stylus is available.",5,5);
 
-  cover = createGraphics(800, 400);
+  cover = createGraphics(900, 400);
   cover.fill(255, 128, 64);
 
   KA = new foxIA.KeyAction(this.canvas, {
@@ -121,24 +191,25 @@ function setup() {
       }
     });
   }
-
 }
 
 function draw() {
   background(128);
 
   image(guide,0,0);
-  image(keyMapGuide,0,400);
-
-  for(const e of envArray){
-    e.updateState();
-    e.drawLine();
+  if(!isMobile){
+    image(keyMapGuide,0,400);
   }
 
   cover.background(0,24);
   blendMode(DIFFERENCE);
   image(cover,0,0);
   blendMode(BLEND);
+
+  for(const e of envArray){
+    e.updateState();
+    e.drawLine();
+  }
 
   // 初期化前は暗くする処理
   if(actx===undefined){background(0,128);}
@@ -172,14 +243,33 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = null;
   }
   capture(){
+    // 先にキーを捕捉し、失敗したら何もしない。
+    const k = getKey(this.x, this.y);
+    if(k === null)return;
+    // キーが捕捉できたらenvを捕捉する
     this.env = getEnvelope();
     if(this.env === null) return;
-    //const keyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,22];
-    //const k = whiteKeyArray[floor(constrain(this.x,0,799)/50)];
+    this.env.play({
+      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
+      maxVolume:config.volume
+    });
+    this.env.captureKeyBoard(k);
+    //k.display(cover);
+  }
+  legato(){
+    // とらえたキーのvalueとthis.env.keyboard.getValue()を比較
+    if(this.env===null)return;
     const k = getKey(this.x, this.y);
     if(k===null)return;
+    // ここで比較する。同じ場合は乗り換えない。
+    if(k.getValue() === this.env.getValue())return;
+    //if(k.isCaptured())return;
+    this.release();
+    this.env = getEnvelope();
+    if(this.env===null)return;
     this.env.play({
-      type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
+      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
+      maxVolume:config.volume
     });
     this.env.captureKeyBoard(k);
   }
@@ -190,13 +280,19 @@ class OscillatorPointer extends foxIA.PointerPrototype{
   mouseDownAction(e){
     this.capture();
   }
+  mouseMoveAction(e){
+    this.legato();
+  }
   mouseUpAction(){
     this.release();
   }
   touchStartAction(t){
     this.capture();
   }
-  touchEndAction(t){
+  touchMoveAction(t){
+    this.legato();
+  }
+  touchEndAction(){
     this.release();
   }
 }
@@ -271,7 +367,13 @@ class SpringEnvelope{
     this.keyboard.display(cover);
   }
   releaseKeyBoard(){
+    if(this.keyboard===null)return;
     this.keyboard = null;
+  }
+  getValue(){
+    // 補足してるキーの...valueを出す。無い場合はnullを返す。
+    if(this.keyboard===null)return null;
+    return this.keyboard.getValue();
   }
   initialize(ctx){
     this.ctx = ctx;
@@ -315,7 +417,7 @@ class SpringEnvelope{
     if(!this.isPlaying)return;
     const y = 400*(1-this.volumeRatio);
     stroke(this.lineColor);
-    line(0,y,800,y);
+    line(0,y,width,y);
   }
   updateVolume(){
     this.gain.gain.setValueAtTime(
