@@ -69,13 +69,36 @@ if (nav.platform !== undefined) {
   isMobile = true;
 }
 
+// 主な変更点
+// configを導入して音量とオシレータタイプを変えられるようにした
+// 線を描画するのはキーボードを塗った後
+// 鍵盤を2つ追加
+// 線の色を青系統に変更
+
+const config = {
+  oscType: "triangle",
+  volume: 0.5
+}
+
+function createGUI(){
+  const gui = new lil.GUI();
+  gui.add(config, "oscType", ["triangle","square","sine","sawtooth"]);
+  gui.add(config, "volume", 0, 1, 0.01);
+  // このように書くとデフォルトで閉じていてくれる
+  gui.close();
+}
+
 let guide;
 let cover;
 
 let actx;
 //const actx = new AudioContext();
 
-const lineColorPalette = ["red","blue","green","orange","pink"];
+// cf:https://openprocessing.org/sketch/1966344
+const lineColorPalette = [
+  "blue","aquamarine","turquoise","teal","seagreen",
+  "navy","deepskyblue","dodgerblue","steelblue","royalblue"
+];
 
 let IA;
 let KA;
@@ -85,11 +108,10 @@ let envArray = [];
 const whiteKeys = [];
 const blackKeys = [];
 const allKeys = [];
-const whiteKeyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,23,24];
+const whiteKeyArray = [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,23,24,26];
 const blackKeyArray = [
-  -4, -2, 999, 1, 3, 999, 6, 8, 10, 999, 13, 15, 999, 18, 20, 22, 999
+  -4, -2, 999, 1, 3, 999, 6, 8, 10, 999, 13, 15, 999, 18, 20, 22, 999, 25, 27
 ];
-
 // [-3,-1,0,2,4,5,7,9,11,12,14,16,17,19,21,22]
 const freqMap = {
   KeyA:-3, KeyS:-1, KeyD:0, KeyF:2, KeyG:4, KeyH:5, KeyJ:7, KeyK:9, KeyL:11,
@@ -106,8 +128,9 @@ function preload(){
 }
 
 function setup() {
-  createCanvas(800, (isMobile ? 400 : 800));
+  createCanvas(900, (isMobile ? 400 : 800));
   pixelDensity(1);
+  createGUI();
 
   IA = new foxIA.Interaction(this.canvas, {factory:()=>{
     if(actx === undefined){
@@ -144,12 +167,12 @@ function setup() {
     return 0;
   });
 
-  guide = createGraphics(800,400);
+  guide = createGraphics(900,400);
   displayKeys(guide);
   guide.noStroke().fill(255).textAlign(LEFT,TOP).textSize(16).textStyle(ITALIC);
   guide.text("mouse,touch,stylus is available.",5,5);
 
-  cover = createGraphics(800, 400);
+  cover = createGraphics(900, 400);
   cover.fill(255, 128, 64);
 
   KA = new foxIA.KeyAction(this.canvas, {
@@ -178,15 +201,15 @@ function draw() {
     image(keyMapGuide,0,400);
   }
 
-  for(const e of envArray){
-    e.updateState();
-    e.drawLine();
-  }
-
   cover.background(0,24);
   blendMode(DIFFERENCE);
   image(cover,0,0);
   blendMode(BLEND);
+
+  for(const e of envArray){
+    e.updateState();
+    e.drawLine();
+  }
 
   // 初期化前は暗くする処理
   if(actx===undefined){background(0,128);}
@@ -227,7 +250,8 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = getEnvelope();
     if(this.env === null) return;
     this.env.play({
-      type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
+      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
+      maxVolume:config.volume
     });
     this.env.captureKeyBoard(k);
     //k.display(cover);
@@ -244,7 +268,8 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = getEnvelope();
     if(this.env===null)return;
     this.env.play({
-      type:'triangle', freq:440*pow(2,(3+k.getValue())/12)
+      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
+      maxVolume:config.volume
     });
     this.env.captureKeyBoard(k);
   }
@@ -392,7 +417,7 @@ class SpringEnvelope{
     if(!this.isPlaying)return;
     const y = 400*(1-this.volumeRatio);
     stroke(this.lineColor);
-    line(0,y,800,y);
+    line(0,y,width,y);
   }
   updateVolume(){
     this.gain.gain.setValueAtTime(
