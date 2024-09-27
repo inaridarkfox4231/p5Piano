@@ -80,6 +80,9 @@ if (nav.platform !== undefined) {
 // oscTypeとvolumeもconfigで決める、可変部分をfreqだけにする
 // オシレータの数を24個に増量
 // 変更は以上です
+// erase使えばいいんだ
+// ただp5のerase()はnoErase()と組み合わせる必要があるなど不便な点が多いので
+// ダイレクトにグロコンいじった方がずっと楽
 
 const config = {
   oscType: "triangle",
@@ -183,7 +186,7 @@ function setup() {
   guide.text("mouse,touch,stylus is available.",5,5);
 
   cover = createGraphics(900, 400);
-  cover.fill(255, 128, 64);
+  cover.fill("teal");
 
   KA = new foxIA.KeyAction(this.canvas, {
     keyAgentFactory:(code)=>new OscillatorKeyAgent(code)
@@ -211,10 +214,9 @@ function draw() {
     image(keyMapGuide,0,400);
   }
 
-  cover.background(0,24);
-  blendMode(DIFFERENCE);
+  cover.drawingContext.globalCompositeOperation="destination-out";
+  cover.background(0,16);
   image(cover,0,0);
-  blendMode(BLEND);
 
   for(const e of envArray){
     e.updateState();
@@ -370,6 +372,7 @@ class SpringEnvelope{
   }
   displayKeyBoard(){
     if(this.keyboard===null)return;
+    cover.drawingContext.globalCompositeOperation="source-over";
     this.keyboard.display(cover);
   }
   releaseKeyBoard(){
