@@ -74,16 +74,26 @@ if (nav.platform !== undefined) {
 // 線を描画するのはキーボードを塗った後
 // 鍵盤を2つ追加
 // 線の色を青系統に変更
+// 変更点追加
+// pedalWeightとreverbを追加
+// keyboardがconfigを反映してない問題を修正
+// oscTypeとvolumeもconfigで決める、可変部分をfreqだけにする
+// オシレータの数を24個に増量
+// 変更は以上です
 
 const config = {
   oscType: "triangle",
-  volume: 0.5
+  volume: 0.5,
+  pedalWeight:0.5, // ペダルの重さ
+  reverb:0 // 残響
 }
 
 function createGUI(){
   const gui = new lil.GUI();
   gui.add(config, "oscType", ["triangle","square","sine","sawtooth"]);
   gui.add(config, "volume", 0, 1, 0.01);
+  gui.add(config, "pedalWeight", 0, 1, 0.01);
+  gui.add(config, "reverb", 0, 1, 0.01);
   // このように書くとデフォルトで閉じていてくれる
   gui.close();
 }
@@ -139,7 +149,7 @@ function setup() {
     return new OscillatorPointer();
   }});
 
-  for(let i=0;i<16;i++){
+  for(let i=0;i<24;i++){
     envArray.push(new SpringEnvelope());
   }
 
@@ -226,9 +236,7 @@ class OscillatorKeyAgent extends foxIA.KeyAgent{
     const keyValue = freqMap[this.code];
     const freq = 440*Math.pow(2,(3+keyValue)/12);
     this.env = env;
-    this.env.play({
-      type:'triangle', freq:freq
-    });
+    this.env.play({freq:freq});
     this.env.captureKeyBoard(allKeys[keyValue+4]);
   }
   release(){
@@ -250,8 +258,7 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = getEnvelope();
     if(this.env === null) return;
     this.env.play({
-      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
-      maxVolume:config.volume
+      freq:440*pow(2,(3+k.getValue())/12)
     });
     this.env.captureKeyBoard(k);
     //k.display(cover);
@@ -268,8 +275,7 @@ class OscillatorPointer extends foxIA.PointerPrototype{
     this.env = getEnvelope();
     if(this.env===null)return;
     this.env.play({
-      type:config.oscType, freq:440*pow(2,(3+k.getValue())/12),
-      maxVolume:config.volume
+      freq:440*pow(2,(3+k.getValue())/12)
     });
     this.env.captureKeyBoard(k);
   }
@@ -381,9 +387,16 @@ class SpringEnvelope{
     this.gain = actx.createGain();
   }
   play(params = {}){
+    // upCoeff:0.55～0.95: pedalWeight:0～1で設定する。default:0.5（つまり0.75）
+    // downCoeff:0.85～0.95: reverb:0～1で設定する.default:0（つまり0.85）
+    const defaultUpCoeff = 0.55 + 0.4*config.pedalWeight;
+    const defaultDownCoeff = 0.85 + 0.1*config.reverb;
+    const defaultOscType = config.oscType;
+    const defaultMaxVolume = config.volume;
     const {
-      type = 'triangle', freq = 440,
-      upCoeff = 0.85, downCoeff = 0.85, maxVolume = 0.5
+      type = defaultOscType, freq = 440,
+      upCoeff = defaultUpCoeff, downCoeff = defaultDownCoeff,
+      maxVolume = defaultMaxVolume
     } = params;
     this.upCoeff = upCoeff;
     this.downCoeff = downCoeff;
