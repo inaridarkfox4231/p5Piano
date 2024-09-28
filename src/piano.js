@@ -41,6 +41,8 @@
 // それは困る。
 // KeyAgentについてはキーの取得が前提なので問題ないです
 
+let compressor;
+
 // pixiがこういうのやってた
 /** 端末ごとにパフォーマンスを調整するための変数です。 */
 const nav = window.navigator;
@@ -88,7 +90,8 @@ const config = {
   oscType: "triangle",
   volume: 0.5,
   pedalWeight:0.5, // ペダルの重さ
-  reverb:0 // 残響
+  reverb:0, // 残響
+  useCompressor:true
 }
 
 function createGUI(){
@@ -97,6 +100,7 @@ function createGUI(){
   gui.add(config, "volume", 0, 1, 0.01);
   gui.add(config, "pedalWeight", 0, 1, 0.01);
   gui.add(config, "reverb", 0, 1, 0.01);
+  gui.add(config, "useCompressor");
   // このように書くとデフォルトで閉じていてくれる
   gui.close();
 }
@@ -336,6 +340,7 @@ function getKey(x, y){
 function initializeEnvelopes(){
   if(actx !== undefined) return;
   actx = new AudioContext();
+  compressor = actx.createDynamicsCompressor();
   for(const e of envArray){
     e.initialize(actx);
   }
@@ -412,7 +417,13 @@ class SpringEnvelope{
     this.gain.gain.setValueAtTime(0, t);
 
     this.osc.connect(this.gain);
-    this.gain.connect(actx.destination); // つなぎなおし。
+    // compressorでうなりを除去
+    if(config.useCompressor){
+      this.gain.connect(compressor);
+      compressor.connect(actx.destination);
+    }else{
+      this.gain.connect(actx.destination); // つなぎなおし。
+    }
 
     this.isPlaying = true;
     this.isCaptured = true;
